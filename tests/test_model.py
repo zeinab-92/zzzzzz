@@ -9,9 +9,11 @@ import pytest
 from src.features import build_training_frame, feature_columns
 from src.model import (
     build_model,
+    build_return_model,
     evaluate_model,
     select_model,
     train_model,
+    train_return_model,
     tune_threshold,
     walk_forward_accuracy,
 )
@@ -93,3 +95,24 @@ def test_predict_next_day_shape_and_range() -> None:
     assert 0.0 <= prediction.probability_up <= 1.0
     assert prediction.last_close == float(df["Close"].iloc[-1])
     assert prediction.label_fa in {"صعودی", "نزولی"}
+    # Without a regression model the percentage change is unavailable.
+    assert prediction.predicted_return_pct is None
+    assert prediction.predicted_close is None
+
+
+def test_build_return_model_has_scaler_and_regressor() -> None:
+    model = build_return_model()
+    assert "scaler" in model.named_steps
+    assert "reg" in model.named_steps
+
+
+def test_predict_next_day_with_return_model() -> None:
+    df = _ohlcv()
+    frame = build_training_frame(df)
+    model = train_model(frame)
+    return_model = train_return_model(frame)
+    prediction = predict_next_day(model, df, return_model=return_model)
+    assert prediction.predicted_return_pct is not None
+    # Projected close is consistent with the predicted percentage change.
+    expected = prediction.last_close * (1 + prediction.predicted_return_pct / 100)
+    assert prediction.predicted_close == pytest.approx(expected)

@@ -19,8 +19,10 @@ rows for the total market index (شاخص کل), ordered oldest-first.
    accuracy, `tune_threshold` tunes the P(up) decision threshold to counter the
    upward-drift bias of a long-only index, and `walk_forward_accuracy` runs an
    expanding-window backtest. All are compared against a majority-class baseline.
-4. **`src/predict.py`** — produces tomorrow's direction and the probability of
-   an up move from the most recent session, using the tuned threshold.
+4. **`src/predict.py`** — produces tomorrow's direction, the probability of an
+   up move (using the tuned threshold) and, via an optional
+   `GradientBoostingRegressor` (`train_return_model`), the predicted next-day
+   **percentage change** and projected close.
 
 ## Setup
 
@@ -57,6 +59,8 @@ Walk-forward accuracy (last 250d): 0.6960
 Last close:         5,311,523.7
 Direction:          UP (صعودی)
 P(up):              0.6809
+Predicted change:   +1.30%
+Projected close:    5,380,536.4
 ```
 
 Choose a specific classifier or backtest horizon with `--model` and

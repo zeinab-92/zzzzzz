@@ -7,6 +7,8 @@ import pandas as pd
 
 # Column produced as the classification target: 1 if next close > current close.
 TARGET_COLUMN = "target_up"
+# Column produced as the regression target: next-day percentage change of close.
+RETURN_TARGET_COLUMN = "target_return"
 
 
 def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
@@ -160,13 +162,19 @@ def feature_columns(df: pd.DataFrame) -> list[str]:
 
 
 def add_target(df: pd.DataFrame) -> pd.DataFrame:
-    """Add the next-day direction target (1 = up, 0 = down/flat)."""
+    """Add the next-day direction and percentage-change targets.
+
+    ``TARGET_COLUMN`` is 1 when the next close is higher than the current one.
+    ``RETURN_TARGET_COLUMN`` is the next-day percentage change of close (%).
+    Both are NA on the final row, which has no known next-day close.
+    """
     out = df.copy()
     next_close = out["Close"].shift(-1)
     target = (next_close > out["Close"]).astype("Int64")
     # Rows without a known next-day close have an undefined target.
     target[next_close.isna()] = pd.NA
     out[TARGET_COLUMN] = target
+    out[RETURN_TARGET_COLUMN] = (next_close / out["Close"] - 1.0) * 100.0
     return out
 
 
@@ -179,7 +187,7 @@ def build_training_frame(df: pd.DataFrame) -> pd.DataFrame:
     """
     featured = build_features(df)
     with_target = add_target(featured)
-    cols = feature_columns(with_target) + [TARGET_COLUMN]
+    cols = feature_columns(with_target) + [TARGET_COLUMN, RETURN_TARGET_COLUMN]
     trimmed = with_target.dropna(subset=cols).reset_index(drop=True)
     trimmed[TARGET_COLUMN] = trimmed[TARGET_COLUMN].astype(int)
     return trimmed

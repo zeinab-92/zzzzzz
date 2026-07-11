@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.features import (
+    RETURN_TARGET_COLUMN,
     TARGET_COLUMN,
     add_target,
     build_features,
@@ -56,10 +57,19 @@ def test_add_target_is_binary_and_shifted() -> None:
 
 def test_build_training_frame_has_no_nulls_and_int_target() -> None:
     frame = build_training_frame(_ohlcv(80))
-    cols = feature_columns(frame) + [TARGET_COLUMN]
+    cols = feature_columns(frame) + [TARGET_COLUMN, RETURN_TARGET_COLUMN]
     assert not frame[cols].isnull().any(axis=None)
     assert frame[TARGET_COLUMN].dtype == int
     assert set(frame[TARGET_COLUMN].unique()).issubset({0, 1})
+
+
+def test_return_target_matches_direction_sign() -> None:
+    frame = build_training_frame(_ohlcv(80))
+    # A positive next-day return must correspond to an "up" label.
+    up_rows = frame[frame[TARGET_COLUMN] == 1]
+    down_rows = frame[frame[TARGET_COLUMN] == 0]
+    assert (up_rows[RETURN_TARGET_COLUMN] > 0).all()
+    assert (down_rows[RETURN_TARGET_COLUMN] <= 0).all()
 
 
 def test_feature_columns_subset_of_frame() -> None:

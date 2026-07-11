@@ -11,7 +11,13 @@ from pathlib import Path
 
 from src.data_loader import load_market_data
 from src.features import build_training_frame
-from src.model import evaluate_model, select_model, train_model, walk_forward_accuracy
+from src.model import (
+    evaluate_model,
+    select_model,
+    train_model,
+    train_return_model,
+    walk_forward_accuracy,
+)
 from src.predict import predict_next_day
 
 DEFAULT_INPUT = Path(__file__).parent / "data" / "ShKol.xlsx"
@@ -85,12 +91,18 @@ def main(argv: list[str] | None = None) -> None:
         print(f"\nWalk-forward accuracy (last {args.backtest}d): {wf:.4f}")
 
     model = train_model(frame, model_name=model_name)
-    prediction = predict_next_day(model, df, threshold=threshold)
+    return_model = train_return_model(frame)
+    prediction = predict_next_day(
+        model, df, threshold=threshold, return_model=return_model
+    )
 
     print("\n=== Next-day prediction ===")
     print(f"Last close:         {prediction.last_close:,.1f}")
     print(f"Direction:          {prediction.direction} ({prediction.label_fa})")
     print(f"P(up):              {prediction.probability_up:.4f}")
+    if prediction.predicted_return_pct is not None:
+        print(f"Predicted change:   {prediction.predicted_return_pct:+.2f}%")
+        print(f"Projected close:    {prediction.predicted_close:,.1f}")
 
 
 if __name__ == "__main__":

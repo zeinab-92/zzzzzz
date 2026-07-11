@@ -6,14 +6,18 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import (
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+)
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .features import TARGET_COLUMN, feature_columns
+from .features import RETURN_TARGET_COLUMN, TARGET_COLUMN, feature_columns
 
 # Default decision threshold on P(up); tuned per-model by ``tune_threshold``.
 DEFAULT_THRESHOLD = 0.5
@@ -189,5 +193,28 @@ def train_model(
     """Fit the model on the full training frame."""
     x, y = _xy(frame)
     model = build_model(model_name=model_name, random_state=random_state)
+    model.fit(x, y)
+    return model
+
+
+def _xy_return(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    features = feature_columns(frame)
+    return frame[features].to_numpy(), frame[RETURN_TARGET_COLUMN].to_numpy()
+
+
+def build_return_model(random_state: int = 42) -> Pipeline:
+    """Create the scaling + gradient-boosting regression pipeline."""
+    return Pipeline(
+        steps=[
+            ("scaler", StandardScaler()),
+            ("reg", GradientBoostingRegressor(random_state=random_state)),
+        ]
+    )
+
+
+def train_return_model(frame: pd.DataFrame, random_state: int = 42) -> Pipeline:
+    """Fit the next-day percentage-change regressor on the full frame."""
+    x, y = _xy_return(frame)
+    model = build_return_model(random_state=random_state)
     model.fit(x, y)
     return model
