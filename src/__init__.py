@@ -1,0 +1,1 @@
+"""Market-direction prediction package."""
