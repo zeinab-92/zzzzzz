@@ -11,7 +11,7 @@ from pathlib import Path
 
 from src.data_loader import load_market_data
 from src.features import build_training_frame
-from src.model import evaluate_model, train_model
+from src.model import evaluate_model, select_model, train_model, walk_forward_accuracy
 from src.predict import predict_next_day
 
 DEFAULT_INPUT = Path(__file__).parent / "data" / "ShKol.xlsx"
@@ -39,6 +39,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=5,
         help="Number of time-series cross-validation folds.",
     )
+    parser.add_argument(
+        "--model",
+        default="auto",
+        choices=["auto", "gboost", "forest", "logistic"],
+        help="Classifier to use; 'auto' selects the best by CV accuracy.",
+    )
+    parser.add_argument(
+        "--backtest",
+        type=int,
+        default=250,
+        help="Walk-forward backtest horizon in trading days (0 to skip).",
+    )
     return parser.parse_args(argv)
 
 
@@ -51,15 +63,29 @@ def main(argv: list[str] | None = None) -> None:
     frame = build_training_frame(df)
     print(f"Built training frame with {len(frame)} labelled samples")
 
-    result = evaluate_model(frame, n_splits=args.splits)
+    if args.model == "auto":
+        model_name, threshold, result = select_model(frame, n_splits=args.splits)
+        print(f"\nSelected model:      {model_name} (threshold={threshold})")
+    else:
+        model_name = args.model
+        threshold = 0.5
+        result = evaluate_model(frame, n_splits=args.splits, model_name=model_name)
+
     print("\n=== Time-series cross-validation ===")
     print(f"Folds:              {result.n_splits}")
     print(f"Accuracy:           {result.accuracy:.4f}")
     print(f"F1 (up class):      {result.f1:.4f}")
     print(f"Baseline accuracy:  {result.baseline_accuracy:.4f}")
+    print(f"Decision threshold: {result.threshold}")
 
-    model = train_model(frame)
-    prediction = predict_next_day(model, df)
+    if args.backtest > 0:
+        wf = walk_forward_accuracy(
+            frame, horizon=args.backtest, model_name=model_name, threshold=threshold
+        )
+        print(f"\nWalk-forward accuracy (last {args.backtest}d): {wf:.4f}")
+
+    model = train_model(frame, model_name=model_name)
+    prediction = predict_next_day(model, df, threshold=threshold)
 
     print("\n=== Next-day prediction ===")
     print(f"Last close:         {prediction.last_close:,.1f}")

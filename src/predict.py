@@ -36,13 +36,21 @@ def latest_feature_row(df: pd.DataFrame) -> pd.DataFrame:
     return last
 
 
-def predict_next_day(model: Pipeline, df: pd.DataFrame) -> Prediction:
-    """Predict tomorrow's direction from the most recent OHLCV history."""
+def predict_next_day(
+    model: Pipeline, df: pd.DataFrame, threshold: float = 0.5
+) -> Prediction:
+    """Predict tomorrow's direction from the most recent OHLCV history.
+
+    Args:
+        model: A fitted classification pipeline.
+        df: Raw OHLCV history (oldest row first).
+        threshold: Decision threshold on P(up); values above map to "UP".
+    """
     last = latest_feature_row(df)
     x = last.to_numpy()
 
     proba_up = float(model.predict_proba(x)[0][1])
-    direction = "UP" if proba_up >= 0.5 else "DOWN"
+    direction = "UP" if proba_up >= threshold else "DOWN"
     last_close = float(df["Close"].iloc[-1])
     return Prediction(
         direction=direction,
